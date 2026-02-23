@@ -17,6 +17,8 @@ Prioritäten:
 import appdaemon.plugins.hass.hassapi as hass
 from datetime import datetime, timedelta
 import statistics
+import os
+import shutil
 
 
 # ─────────────────────────────────────────────
@@ -87,6 +89,9 @@ class EnergyManager(hass.Hass):
     def initialize(self):
         """AppDaemon-Initialisierung."""
         self.log("🔋 Energy Manager gestartet", level="INFO")
+
+        # Dashboard-Dateien nach /config/www/ bereitstellen
+        self._deploy_dashboard()
 
         # Zustandsspeicher für Hysterese (verhindert zu häufiges Schalten)
         self.state = {
@@ -379,6 +384,33 @@ class EnergyManager(hass.Hass):
             f"Preis: {s['current_price_ct']:.1f}Ct/kWh ({s['price_level']})",
             level="INFO"
         )
+
+    def _deploy_dashboard(self):
+        """Kopiert Dashboard-Dateien nach /config/www/energy_manager/ für HA-Zugriff."""
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        src_dir = os.path.join(app_dir, "dashboard")
+        dest_dir = "/config/www/energy_manager"
+
+        if not os.path.isdir(src_dir):
+            self.log("Dashboard-Quelldateien nicht gefunden, überspringe Deploy", level="DEBUG")
+            return
+
+        os.makedirs(dest_dir, exist_ok=True)
+
+        for filename in os.listdir(src_dir):
+            src_file = os.path.join(src_dir, filename)
+            dest_file = os.path.join(dest_dir, filename)
+
+            if not os.path.isfile(src_file):
+                continue
+
+            # Nur kopieren wenn Ziel nicht existiert oder Quelle neuer ist
+            if (not os.path.exists(dest_file)
+                    or os.path.getmtime(src_file) > os.path.getmtime(dest_file)):
+                shutil.copy2(src_file, dest_file)
+                self.log(f"Dashboard-Datei kopiert: {filename}", level="INFO")
+
+        self.log(f"Dashboard verfügbar unter /local/energy_manager/energy_manager_dashboard.html", level="INFO")
 
     def on_price_change(self, entity, attribute, old, new, kwargs):
         """Reagiert auf Preisänderungen (z.B. stündlich bei Tibber)."""

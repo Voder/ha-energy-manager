@@ -14,14 +14,17 @@ Automatisiertes Energiemanagement mit AppDaemon – optimiert PV-Nutzung, Akkust
 ## Projektstruktur
 
 ```
-energy-manager/
-├── appdaemon/
-│   ├── energy_manager.py   # AppDaemon-App (Kernlogik)
-│   └── apps.yaml           # AppDaemon-Konfiguration
-├── dashboard/
-│   ├── energy_manager_dashboard.html  # Live-Dashboard
-│   └── ha_websocket.js     # HA WebSocket API Client
-├── .gitignore
+ha-energy-manager/
+├── apps/
+│   └── energy_manager/
+│       ├── energy_manager.py          # AppDaemon-App (Kernlogik)
+│       ├── apps.yaml                  # Minimal-Konfiguration (module + class)
+│       ├── apps.yaml.template         # Vorlage mit allen Parametern
+│       └── dashboard/
+│           ├── energy_manager_dashboard.html  # Live-Dashboard
+│           └── ha_websocket.js               # HA WebSocket API Client
+├── hacs.json
+├── CLAUDE.md
 └── README.md
 ```
 
@@ -30,18 +33,27 @@ energy-manager/
 ### 1. AppDaemon installieren
 HA → Einstellungen → Add-ons → AppDaemon
 
-### 2. Dateien kopieren
+### 2. HACS-Installation
+1. HACS → AppDaemon Apps → Repository hinzufügen → `https://github.com/DEIN_USER/ha-energy-manager`
+2. Energy Manager installieren
+3. AppDaemon neu starten
+
+Nach der Installation liegt die App automatisch unter `/config/appdaemon/apps/energy_manager/` und ist sofort lauffähig.
+
+### 3. Entity IDs anpassen (optional)
+Kopiere `apps.yaml.template` als `apps.yaml` und passe die Werte an dein Setup an:
 ```bash
-cp appdaemon/energy_manager.py /config/appdaemon/apps/
-cp appdaemon/apps.yaml /config/appdaemon/apps/
+cd /config/appdaemon/apps/energy_manager/
+cp apps.yaml.template apps.yaml
+# apps.yaml bearbeiten – Entity IDs und Schwellenwerte anpassen
 ```
 
-### 3. Entity IDs anpassen
-In `energy_manager.py` den `CONFIG["entities"]`-Block an eigene HA-Entities anpassen.
+Alternativ: Die Standardwerte in `energy_manager.py` (CONFIG-Block) direkt anpassen.
 
 ### 4. Dashboard öffnen
+Das Dashboard wird beim App-Start automatisch nach `/config/www/energy_manager/` kopiert und ist dann unter folgender URL erreichbar:
 ```
-energy_manager_dashboard.html?host=192.168.1.X&token=DEIN_TOKEN
+http://DEINE_HA_IP:8123/local/energy_manager/energy_manager_dashboard.html?token=DEIN_TOKEN
 ```
 Token erstellen: **HA → Profil → Langlebige Zugriffstoken**
 
@@ -60,6 +72,7 @@ Token erstellen: **HA → Profil → Langlebige Zugriffstoken**
 - [x] Push-Benachrichtigungen
 - [x] Live-Dashboard mit Sparklines
 - [x] WebSocket HA-Anbindung
+- [x] HACS-kompatible Repo-Struktur
 - [ ] Direkte Steuerung (Wallbox, Wechselrichter)
 - [ ] Tibber 24h-Preisoptimierung
 - [ ] Lineare Optimierung (PuLP)

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.hacs.xyz)",
+      "WebFetch(domain:appdaemon.readthedocs.io)"
+    ]
+  }
+}

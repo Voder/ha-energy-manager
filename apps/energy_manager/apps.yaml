@@ -1,0 +1,3 @@
+energy_manager:
+  module: energy_manager
+  class: EnergyManager

@@ -1,5 +1,6 @@
 # apps.yaml – AppDaemon Konfiguration für den Energy Manager
-# Ablegen unter: /config/appdaemon/apps/apps.yaml
+# Kopiere diese Datei als apps.yaml und passe die Werte an dein Setup an.
+# Alle Parameter sind optional – Standardwerte sind im Python-Code hinterlegt.
 
 energy_manager:
   module: energy_manager

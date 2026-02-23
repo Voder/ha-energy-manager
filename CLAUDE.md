@@ -6,15 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **HA Energy Manager** is a Home Assistant add-on that automates energy optimization for solar PV, home batteries, EV charging, and dynamic electricity pricing (Tibber). It runs as an **AppDaemon** Python app and includes a live web dashboard.
 
-This is a HACS-compatible custom integration. No build step is needed — files are deployed directly into Home Assistant.
+This is a HACS-compatible AppDaemon app. No build step is needed — HACS installs it directly into `/config/appdaemon/apps/energy_manager/`.
 
 ## Deployment
 
-```bash
-# Copy app files to Home Assistant AppDaemon directory
-cp appdaemon/energy_manager.py /config/appdaemon/apps/
-cp appdaemon/apps.yaml /config/appdaemon/apps/
-```
+HACS handles deployment automatically. After HACS installation:
+- App files land in `/config/appdaemon/apps/energy_manager/`
+- Dashboard files are auto-copied to `/config/www/energy_manager/` on app startup
+- Only `apps.yaml` needs optional customization (copy from `apps.yaml.template`)
 
 There are no automated tests. Logic is validated manually in a running Home Assistant instance.
 
@@ -22,13 +21,15 @@ There are no automated tests. Logic is validated manually in a running Home Assi
 
 ### Core Components
 
-**`appdaemon/energy_manager.py`** — The main AppDaemon app. Three key phases:
-1. `get_system_state()` — Reads 15+ HA sensor entities; computes derived metrics (PV surplus, etc.)
-2. `make_decisions()` — Priority-based decision engine (see below)
-3. `execute_decisions()` — Sends push notifications with a 2-hour cooldown per decision type
+**`apps/energy_manager/energy_manager.py`** — The main AppDaemon app. Key phases:
+1. `initialize()` — Deploys dashboard files, sets up scheduler and price-change listener
+2. `get_system_state()` — Reads 15+ HA sensor entities; computes derived metrics (PV surplus, etc.)
+3. `make_decisions()` — Priority-based decision engine (see below)
+4. `execute_decisions()` — Sends push notifications with a 2-hour cooldown per decision type
+5. `_deploy_dashboard()` — Copies dashboard files to `/config/www/energy_manager/` if newer
 
-**`dashboard/energy_manager_dashboard.html`** — Single-file self-contained dashboard
-**`dashboard/ha_websocket.js`** — WebSocket client that caches entity states and subscribes to changes from HA
+**`apps/energy_manager/dashboard/energy_manager_dashboard.html`** — Single-file self-contained dashboard
+**`apps/energy_manager/dashboard/ha_websocket.js`** — WebSocket client that caches entity states and subscribes to changes from HA
 
 ### Decision Priority Order
 
@@ -40,12 +41,12 @@ The decision engine in `make_decisions()` evaluates in strict priority:
 ### Configuration
 
 App parameters live in two places:
-- **`appdaemon/apps.yaml`** — Overridable runtime config (thresholds, entity IDs, capacities)
-- **`appdaemon/energy_manager.py`** lines 25–81 — `CONFIG` dict with hardcoded defaults
+- **`apps/energy_manager/apps.yaml`** — Minimal config (module + class only); copy from `apps.yaml.template` to override defaults
+- **`apps/energy_manager/energy_manager.py`** lines 25–81 — `CONFIG` dict with hardcoded defaults
 
 Dashboard entity mappings:
-- **`dashboard/ha_websocket.js`** `DEFAULT_ENTITIES` dict (around line 235–254)
-- **`dashboard/energy_manager_dashboard.html`** `CFG` object (around line 532–542)
+- **`apps/energy_manager/dashboard/ha_websocket.js`** `DEFAULT_ENTITIES` dict
+- **`apps/energy_manager/dashboard/energy_manager_dashboard.html`** `CFG` object
 
 ### Entity Naming Conventions
 
