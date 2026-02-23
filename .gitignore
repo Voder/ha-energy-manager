@@ -1,0 +1,20 @@
+# Secrets – NIEMALS einchecken!
+secrets.yaml
+.env
+*.token
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# AppDaemon Logs
+logs/

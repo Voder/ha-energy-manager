@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Energy Manager – Live Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --surface2: #111820;
+    --border: #1d2733;
+    --border2: #243040;
+    --text: #cdd9e5;
+    --muted: #4a5568;
+    --accent-green: #39d353;
+    --accent-yellow: #e3b341;
+    --accent-red: #f85149;
+    --accent-blue: #58a6ff;
+    --accent-orange: #db6d28;
+    --glow-green: rgba(57,211,83,0.15);
+    --glow-blue: rgba(88,166,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .layout { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 28px 24px; }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, #1a2e1a, #0d2010);
+    border: 1px solid var(--accent-green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    box-shadow: 0 0 16px var(--glow-green);
+  }
+  .header-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; letter-spacing: 0.01em; }
+  .header-sub { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: #0d1a0d; border: 1px solid #1e3d1e;
+    border-radius: 6px; padding: 6px 12px;
+    font-size: 0.72rem; color: var(--accent-green);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(57,211,83,0.4); } 50% { opacity:.7; box-shadow: 0 0 0 5px rgba(57,211,83,0); } }
+
+  /* Main grid */
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border2), transparent);
+  }
+  .card-title {
+    font-size: 0.65rem; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--muted);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 7px;
+  }
+  .card-title-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+
+  /* Metric rows */
+  .metric { margin-bottom: 14px; }
+  .metric:last-child { margin-bottom: 0; }
+  .metric-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .metric-label { font-size: 0.72rem; color: var(--muted); }
+  .metric-value { font-size: 1.05rem; font-weight: 500; letter-spacing: -0.01em; }
+  .metric-sub { font-size: 0.65rem; color: var(--muted); }
+
+  /* Progress bar */
+  .progress-track {
+    height: 6px; background: var(--surface2);
+    border-radius: 99px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .progress-fill {
+    height: 100%; border-radius: 99px;
+    transition: width 0.8s cubic-bezier(.4,0,.2,1), background 0.4s;
+    position: relative;
+  }
+  .progress-fill::after {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 8px; height: 100%;
+    background: rgba(255,255,255,0.4);
+    border-radius: 99px;
+    filter: blur(2px);
+  }
+
+  /* Threshold ticks */
+  .progress-wrapper { position: relative; }
+  .tick {
+    position: absolute; top: -2px;
+    width: 1px; height: 10px;
+    background: var(--border2);
+    pointer-events: none;
+  }
+  .tick-label {
+    position: absolute; top: 10px;
+    font-size: 0.58rem; color: var(--muted);
+    transform: translateX(-50%);
+  }
+
+  /* Sparkline */
+  .sparkline-container { margin-top: 10px; position: relative; }
+  .sparkline-label { font-size: 0.6rem; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  svg.sparkline { width: 100%; height: 36px; overflow: visible; }
+  .spark-area { opacity: 0.15; }
+
+  /* Price bar */
+  .price-gradient-bar {
+    height: 8px; border-radius: 99px;
+    background: linear-gradient(to right, #1a3a1a, #39d353 12%, #e3b341 40%, #f85149 70%, #7d1a1a);
+    position: relative; margin: 6px 0 4px;
+    border: 1px solid var(--border);
+  }
+  .price-needle {
+    position: absolute; top: -4px;
+    width: 3px; height: 16px;
+    background: white;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    box-shadow: 0 0 6px rgba(255,255,255,0.6);
+    transition: left 0.8s cubic-bezier(.4,0,.2,1);
+  }
+  .price-zone-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--muted); }
+
+  /* Decisions panel */
+  .decisions-card {
+    grid-column: 1 / -1;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 12px; padding: 18px 20px;
+  }
+  .decisions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+
+  .decision-item {
+    border-radius: 9px; padding: 12px 14px;
+    border: 1px solid;
+    transition: all 0.4s cubic-bezier(.4,0,.2,1);
+    position: relative; overflow: hidden;
+  }
+  .decision-item.active .decision-glow {
+    position: absolute; inset: 0; border-radius: 9px;
+    opacity: 1; transition: opacity 0.4s;
+  }
+  .decision-item.inactive {
+    opacity: 0.22; filter: saturate(0.2);
+  }
+  .decision-item.active { opacity: 1; filter: none; }
+
+  .di-icon { font-size: 1.2rem; margin-bottom: 6px; display: block; }
+  .di-title { font-family: 'Syne', sans-serif; font-size: 0.82rem; font-weight: 700; margin-bottom: 3px; }
+  .di-desc { font-size: 0.68rem; color: var(--muted); line-height: 1.4; }
+  .di-badge {
+    display: inline-block; margin-top: 6px;
+    font-size: 0.6rem; font-weight: 500;
+    padding: 2px 7px; border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Decision color themes */
+  .d-pv-car  { background: #0a1f12; border-color: #1e4d2a; }
+  .d-pv-car.active  { border-color: #39d353; box-shadow: 0 0 20px rgba(57,211,83,0.1); }
+  .d-pv-car .di-badge  { background: #0d2e16; color: var(--accent-green); }
+
+  .d-cheap-bat { background: #191208; border-color: #3d2d08; }
+  .d-cheap-bat.active { border-color: #e3b341; box-shadow: 0 0 20px rgba(227,179,65,0.1); }
+  .d-cheap-bat .di-badge { background: #2a1e08; color: var(--accent-yellow); }
+
+  .d-cheap-car { background: #191208; border-color: #3d2d08; }
+  .d-cheap-car.active { border-color: #db6d28; box-shadow: 0 0 20px rgba(219,109,40,0.1); }
+  .d-cheap-car .di-badge { background: #2a1808; color: var(--accent-orange); }
+
+  .d-bat-pv  { background: #08101f; border-color: #0d2040; }
+  .d-bat-pv.active  { border-color: #58a6ff; box-shadow: 0 0 20px rgba(88,166,255,0.1); }
+  .d-bat-pv .di-badge  { background: #0a1930; color: var(--accent-blue); }
+
+  .d-expensive { background: #1a0808; border-color: #3d0d0d; }
+  .d-expensive.active { border-color: #f85149; box-shadow: 0 0 20px rgba(248,81,73,0.1); }
+  .d-expensive .di-badge { background: #2a0a0a; color: var(--accent-red); }
+
+  .d-ok { background: #0a1209; border-color: #1a2e18; }
+  .d-ok.active { border-color: #39d353; box-shadow: 0 0 20px rgba(57,211,83,0.08); }
+  .d-ok .di-badge { background: #0d2010; color: var(--accent-green); }
+
+  /* Notification */
+  .notification-bar {
+    grid-column: 1 / -1;
+    background: #0d1a10; border: 1px solid #1e4d2a;
+    border-radius: 10px; padding: 14px 18px;
+    display: none;
+    animation: slideIn 0.4s cubic-bezier(.4,0,.2,1);
+  }
+  .notification-bar.show { display: flex; gap: 12px; align-items: flex-start; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-6px);} to { opacity:1; transform:none; } }
+  .notif-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+  .notif-title { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 700; color: var(--accent-green); margin-bottom: 3px; }
+  .notif-text { font-size: 0.75rem; color: #7db889; line-height: 1.5; }
+
+  /* Timestamp */
+  .timestamp { font-size: 0.65rem; color: var(--muted); text-align: right; margin-top: 10px; }
+
+  /* Status indicator for car connected */
+  .conn-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.7rem; padding: 3px 9px; border-radius: 5px;
+    border: 1px solid;
+  }
+  .conn-badge.connected { background: #0a1f12; border-color: #1e4d2a; color: var(--accent-green); }
+  .conn-badge.disconnected { background: #1a0808; border-color: #3d0d0d; color: var(--accent-red); }
+  .conn-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .decisions-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">⚡</div>
+      <div>
+        <div class="header-title">ENERGY MANAGER</div>
+        <div class="header-sub">Home Assistant · AppDaemon</div>
+      </div>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE · aktualisiert <span id="last-update">gerade eben</span>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- PV & Leistung -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-dot" style="background:#e3b341"></div>
+        Photovoltaik & Leistung
+      </div>
+
+      <div class="metric">
+        <div class="metric-header">
+          <span class="metric-label">PV-Leistung</span>
+          <span class="metric-value" id="pv-val" style="color:var(--accent-yellow)">–</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-track">
+            <div class="progress-fill" id="pv-bar" style="background: linear-gradient(90deg, #e3b341, #39d353)"></div>
+          </div>
+          <div class="tick" style="left:20%"><span class="tick-label">2 kW</span></div>
+          <div class="tick" style="left:50%"><span class="tick-label">5 kW</span></div>
+          <div class="tick" style="left:80%"><span class="tick-label">8 kW</span></div>
+        </div>
+        <div class="sparkline-container">
+          <div class="sparkline-label"><span>Verlauf (letzte Stunden)</span><span id="pv-forecast-label">Prognose heute: –</span></div>
+          <svg class="sparkline" id="spark-pv" viewBox="0 0 200 36" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#e3b341" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#e3b341" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="spark-pv-area" class="spark-area" fill="url(#pvGrad)"/>
+            <path id="spark-pv-line" fill="none" stroke="#e3b341" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric" style="padding-top:8px; border-top: 1px solid var(--border)">
+        <div class="metric-header">
+          <span class="metric-label">PV-Überschuss</span>
+          <span class="metric-value" id="surplus-val">–</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="surplus-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hausakku -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-dot" style="background:var(--accent-blue)"></div>
+        Hausakku / Speicher
+      </div>
+      <div class="metric">
+        <div class="metric-header">
+          <span class="metric-label">Ladestand (SOC)</span>
+          <span class="metric-value" id="bat-val" style="color:var(--accent-blue)">–</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-track">
+            <div class="progress-fill" id="bat-bar"></div>
+          </div>
+          <div class="tick" style="left:10%"><span class="tick-label">10%</span></div>
+          <div class="tick" style="left:30%"><span class="tick-label">30%</span></div>
+          <div class="tick" style="left:95%"><span class="tick-label">95%</span></div>
+        </div>
+        <div class="sparkline-container">
+          <div class="sparkline-label"><span>SOC-Verlauf</span><span id="bat-power-label">Ladeleistung: –</span></div>
+          <svg class="sparkline" id="spark-bat" viewBox="0 0 200 36" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="batGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="spark-bat-area" class="spark-area" fill="url(#batGrad)"/>
+            <path id="spark-bat-line" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="metric" style="padding-top:8px; border-top: 1px solid var(--border)">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="metric-label" style="font-size:0.68rem">Verfügbare Energie</span>
+          <span style="font-size:0.8rem;" id="bat-energy">–</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px">
+          <span class="metric-label" style="font-size:0.68rem">Status</span>
+          <span id="bat-status" style="font-size:0.72rem; color:var(--muted)">–</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Elektroauto -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-dot" style="background:var(--accent-green)"></div>
+        Elektroauto
+      </div>
+      <div class="metric">
+        <div class="metric-header">
+          <span class="metric-label">Verbindung</span>
+          <span id="car-connected-badge" class="conn-badge disconnected"><span class="conn-dot"></span>Nicht verbunden</span>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="metric-header">
+          <span class="metric-label">Ladestand (SOC)</span>
+          <span class="metric-value" id="car-val" style="color:var(--accent-green)">–</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-track">
+            <div class="progress-fill" id="car-bar"></div>
+          </div>
+          <div class="tick" style="left:20%"><span class="tick-label">20%</span></div>
+          <div class="tick" style="left:80%"><span class="tick-label">80%</span></div>
+        </div>
+        <div class="sparkline-container">
+          <div class="sparkline-label"><span>SOC-Verlauf</span><span id="car-power-label">Ladeleistung: –</span></div>
+          <svg class="sparkline" id="spark-car" viewBox="0 0 200 36" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="carGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#39d353" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#39d353" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="spark-car-area" class="spark-area" fill="url(#carGrad)"/>
+            <path id="spark-car-line" fill="none" stroke="#39d353" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="metric" style="padding-top:8px; border-top: 1px solid var(--border)">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="metric-label" style="font-size:0.68rem">Reichweite ca.</span>
+          <span style="font-size:0.8rem;" id="car-range">–</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strompreis -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-dot" style="background:var(--accent-orange)"></div>
+        Tibber · Dynamischer Strompreis
+      </div>
+      <div class="metric">
+        <div class="metric-header">
+          <span class="metric-label">Aktueller Preis</span>
+          <span class="metric-value" id="price-val" style="font-size:1.4rem;">–</span>
+        </div>
+        <div class="price-gradient-bar">
+          <div class="price-needle" id="price-needle"></div>
+        </div>
+        <div class="price-zone-labels">
+          <span style="color:var(--accent-green)">günstig</span>
+          <span>normal</span>
+          <span style="color:var(--accent-red)">teuer</span>
+        </div>
+      </div>
+      <div class="metric" style="padding-top:10px; border-top: 1px solid var(--border)">
+        <div class="sparkline-label"><span>Preisverlauf (letzte Stunden)</span><span id="price-level-label">–</span></div>
+        <svg class="sparkline" id="spark-price" viewBox="0 0 200 36" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#db6d28" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#db6d28" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path id="spark-price-area" class="spark-area" fill="url(#priceGrad)"/>
+          <path id="spark-price-line" fill="none" stroke="#db6d28" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="sparkline-label" style="margin-top:4px;">
+          <span id="price-min-label">Min: –</span>
+          <span id="price-max-label">Max: –</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aktive Benachrichtigung -->
+    <div class="notification-bar" id="notification-bar">
+      <div class="notif-icon">📱</div>
+      <div>
+        <div class="notif-title">Benachrichtigung würde gesendet</div>
+        <div class="notif-text" id="notif-text">–</div>
+      </div>
+    </div>
+
+    <!-- Entscheidungen -->
+    <div class="decisions-card">
+      <div class="card-title" style="margin-bottom:0">
+        <div class="card-title-dot" style="background:var(--text)"></div>
+        Algorithmus-Entscheidungen
+      </div>
+      <div class="decisions-grid">
+
+        <div class="decision-item d-pv-car inactive" id="d-pv-car">
+          <span class="di-icon">☀️🚗</span>
+          <div class="di-title">Auto mit PV laden</div>
+          <div class="di-desc" id="dd-pv-car">PV-Überschuss ≥ 3 kW · Auto verbunden</div>
+          <span class="di-badge">PRIO 1 · AUTARKIE</span>
+        </div>
+
+        <div class="decision-item d-bat-pv inactive" id="d-bat-pv">
+          <span class="di-icon">☀️🔋</span>
+          <div class="di-title">Akku mit PV laden</div>
+          <div class="di-desc" id="dd-bat-pv">PV-Überschuss ≥ 1 kW · Akku nicht voll</div>
+          <span class="di-badge">PRIO 1 · AUTARKIE</span>
+        </div>
+
+        <div class="decision-item d-cheap-bat inactive" id="d-cheap-bat">
+          <span class="di-icon">💰🔋</span>
+          <div class="di-title">Akku aus Netz laden</div>
+          <div class="di-desc" id="dd-cheap-bat">Preis ≤ 8 Ct · Nacht / kein PV</div>
+          <span class="di-badge">PRIO 2 · KOSTEN</span>
+        </div>
+
+        <div class="decision-item d-cheap-car inactive" id="d-cheap-car">
+          <span class="di-icon">💡🚗</span>
+          <div class="di-title">Auto günstig laden</div>
+          <div class="di-desc" id="dd-cheap-car">Preis ≤ 15 Ct · kein PV-Überschuss</div>
+          <span class="di-badge">PRIO 2 · KOSTEN</span>
+        </div>
+
+        <div class="decision-item d-expensive inactive" id="d-expensive">
+          <span class="di-icon">🔴⚡</span>
+          <div class="di-title">Netzbezug vermeiden</div>
+          <div class="di-desc" id="dd-expensive">Strom teuer ≥ 30 Ct · Akku entladen</div>
+          <span class="di-badge">PRIO 2 · KOSTEN</span>
+        </div>
+
+        <div class="decision-item d-ok inactive" id="d-ok">
+          <span class="di-icon">✅</span>
+          <div class="di-title">Normalbetrieb</div>
+          <div class="di-desc">Kein Handlungsbedarf · System optimal</div>
+          <span class="di-badge">OPTIMAL</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="timestamp" id="timestamp">Letzte Aktualisierung: –</div>
+</div>
+
+<script src="ha_websocket.js"></script>
+<script>
+// ─────────────────────────────────────────────────────
+// KONFIGURATION – an Setup anpassen
+// ─────────────────────────────────────────────────────
+const CFG = {
+  battery_capacity_kwh: 10.0,
+  car_capacity_kwh: 77.0,
+  car_range_per_kwh: 6.5,          // km pro kWh (Fahrzeugspezifisch)
+  pv_peak_kw: 10.0,
+  price_cheap: 15, price_very_cheap: 8, price_expensive: 30,
+  pv_surplus_car: 3.0, pv_surplus_battery: 1.0,
+  battery_reserve: 30, battery_max: 95,
+  car_min_soc: 20, car_target_soc: 80,
+  sparkline_points: 24,           // Anzahl Punkte im Verlauf
+};
+
+// ─────────────────────────────────────────────────────
+// SIMULIERTE ECHTZEITDATEN
+// In Produktion: via HA WebSocket API oder REST ersetzen
+// ─────────────────────────────────────────────────────
+function generateRealisticHistory(baseVal, count, spread, min, max) {
+  const hist = [];
+  let val = baseVal;
+  for (let i = 0; i < count; i++) {
+    val += (Math.random() - 0.48) * spread;
+    val = Math.max(min, Math.min(max, val));
+    hist.push(val);
+  }
+  return hist;
+}
+
+// Historien mit simulierten Werten initialisieren
+const history = {
+  pv:    generateRealisticHistory(4.5, CFG.sparkline_points, 1.5, 0, CFG.pv_peak_kw),
+  bat:   generateRealisticHistory(55,  CFG.sparkline_points, 3,   5, 100),
+  car:   generateRealisticHistory(65,  CFG.sparkline_points, 1.5, 0, 100),
+  price: generateRealisticHistory(18,  CFG.sparkline_points, 4,   -5, 60),
+};
+
+// Aktuelle "Live"-Werte (simuliert – in Produktion durch HA-Daten ersetzen)
+let liveData = {
+  pv_kw: 5.2, house_kw: 1.8, battery_soc: 62, battery_kw: 1.2,
+  car_soc: 71, car_connected: true, car_kw: 0,
+  price_ct: 12.4, price_level: 'LOW',
+  pv_forecast_kwh: 34.5,
+};
+
+// ─────────────────────────────────────────────────────
+// SPARKLINE HELPER
+// ─────────────────────────────────────────────────────
+function buildSparkPath(data, minVal, maxVal) {
+  if (!data.length) return { line: '', area: '' };
+  const w = 200, h = 36, pad = 2;
+  const range = maxVal - minVal || 1;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - pad - ((v - minVal) / range) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = 'M ' + points.map(p => p.join(' ')).join(' L ');
+  const area = line + ` L ${points[points.length-1][0]} ${h} L ${points[0][0]} ${h} Z`;
+  return { line, area };
+}
+
+function updateSparkline(id, data, minVal, maxVal) {
+  const { line, area } = buildSparkPath(data, minVal, maxVal);
+  document.getElementById(`spark-${id}-line`).setAttribute('d', line);
+  document.getElementById(`spark-${id}-area`).setAttribute('d', area);
+}
+
+// ─────────────────────────────────────────────────────
+// PROGRESS BAR HELPER
+// ─────────────────────────────────────────────────────
+function socColor(soc, thresholds) {
+  if (soc <= thresholds.red) return 'var(--accent-red)';
+  if (soc <= thresholds.yellow) return 'var(--accent-yellow)';
+  return thresholds.greenColor || 'var(--accent-green)';
+}
+
+function setBar(id, pct, color) {
+  const el = document.getElementById(id);
+  el.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  el.style.background = color;
+}
+
+// ─────────────────────────────────────────────────────
+// HAUPTRENDER-FUNKTION
+// ─────────────────────────────────────────────────────
+function render() {
+  const d = liveData;
+  const surplus = d.pv_kw - d.house_kw;
+  const pvProducingWell = d.pv_kw > CFG.pv_peak_kw * 0.2;
+
+  // ── PV ──────────────────────────────────────────
+  const pvPct = (d.pv_kw / CFG.pv_peak_kw) * 100;
+  document.getElementById('pv-val').textContent = d.pv_kw.toFixed(1) + ' kW';
+  setBar('pv-bar', pvPct, `linear-gradient(90deg, #e3b341, #39d353)`);
+  document.getElementById('pv-forecast-label').textContent = `Prognose heute: ${d.pv_forecast_kwh} kWh`;
+
+  const surplusPct = Math.max(0, (surplus / CFG.pv_peak_kw) * 100);
+  const surplusColor = surplus >= CFG.pv_surplus_car ? 'var(--accent-green)'
+                     : surplus >= CFG.pv_surplus_battery ? 'var(--accent-yellow)'
+                     : 'var(--muted)';
+  document.getElementById('surplus-val').textContent = surplus.toFixed(1) + ' kW';
+  document.getElementById('surplus-val').style.color = surplusColor;
+  setBar('surplus-bar', surplusPct, surplusColor);
+
+  history.pv.push(d.pv_kw); history.pv.shift();
+  updateSparkline('pv', history.pv, 0, CFG.pv_peak_kw);
+
+  // ── AKKU ────────────────────────────────────────
+  const batColor = socColor(d.battery_soc, { red: 15, yellow: 35, greenColor: 'var(--accent-blue)' });
+  document.getElementById('bat-val').textContent = d.battery_soc + '%';
+  document.getElementById('bat-val').style.color = batColor;
+  setBar('bat-bar', d.battery_soc, batColor);
+  const batEnergy = ((d.battery_soc - 10) / 100 * CFG.battery_capacity_kwh).toFixed(1);
+  document.getElementById('bat-energy').textContent = batEnergy + ' kWh nutzbar';
+  const batStatus = d.battery_kw > 0.2 ? `⬆ lädt ${d.battery_kw.toFixed(1)} kW`
+                  : d.battery_kw < -0.2 ? `⬇ entlädt ${Math.abs(d.battery_kw).toFixed(1)} kW`
+                  : '= Standby';
+  document.getElementById('bat-status').textContent = batStatus;
+  document.getElementById('bat-status').style.color = d.battery_kw > 0.2 ? 'var(--accent-green)'
+    : d.battery_kw < -0.2 ? 'var(--accent-red)' : 'var(--muted)';
+  document.getElementById('bat-power-label').textContent = batStatus;
+
+  history.bat.push(d.battery_soc); history.bat.shift();
+  updateSparkline('bat', history.bat, 0, 100);
+
+  // ── AUTO ────────────────────────────────────────
+  const carBadge = document.getElementById('car-connected-badge');
+  carBadge.className = 'conn-badge ' + (d.car_connected ? 'connected' : 'disconnected');
+  carBadge.innerHTML = `<span class="conn-dot"></span>${d.car_connected ? 'Verbunden' : 'Nicht verbunden'}`;
+
+  const carColor = socColor(d.car_soc, { red: 20, yellow: 40 });
+  document.getElementById('car-val').textContent = d.car_soc + '%';
+  document.getElementById('car-val').style.color = carColor;
+  setBar('car-bar', d.car_soc, carColor);
+
+  const range = Math.round((d.car_soc / 100) * CFG.car_capacity_kwh * CFG.car_range_per_kwh);
+  document.getElementById('car-range').textContent = `~${range} km`;
+  const carPower = d.car_kw > 0.2 ? `⬆ lädt ${d.car_kw.toFixed(1)} kW` : '= nicht am Laden';
+  document.getElementById('car-power-label').textContent = carPower;
+
+  history.car.push(d.car_soc); history.car.shift();
+  updateSparkline('car', history.car, 0, 100);
+
+  // ── PREIS ───────────────────────────────────────
+  const priceColor = d.price_ct <= CFG.price_very_cheap ? 'var(--accent-green)'
+                   : d.price_ct <= CFG.price_cheap       ? 'var(--accent-yellow)'
+                   : d.price_ct >= CFG.price_expensive   ? 'var(--accent-red)'
+                   : 'var(--text)';
+  document.getElementById('price-val').textContent = d.price_ct.toFixed(1) + ' Ct/kWh';
+  document.getElementById('price-val').style.color = priceColor;
+
+  // Price needle position: -5..60 → 0..100%
+  const needlePct = Math.max(0, Math.min(100, (d.price_ct + 5) / 65 * 100));
+  document.getElementById('price-needle').style.left = needlePct + '%';
+
+  const levelLabel = d.price_ct <= CFG.price_very_cheap ? '🟢 SEHR GÜNSTIG'
+                   : d.price_ct <= CFG.price_cheap       ? '🟡 GÜNSTIG'
+                   : d.price_ct >= CFG.price_expensive   ? '🔴 TEUER'
+                   : '⚪ NORMAL';
+  document.getElementById('price-level-label').textContent = levelLabel;
+  document.getElementById('price-level-label').style.color = priceColor;
+
+  history.price.push(d.price_ct); history.price.shift();
+  const priceMin = Math.min(...history.price), priceMax = Math.max(...history.price);
+  updateSparkline('price', history.price, priceMin - 2, priceMax + 2);
+  document.getElementById('price-min-label').textContent = `Min: ${priceMin.toFixed(1)} Ct`;
+  document.getElementById('price-max-label').textContent = `Max: ${priceMax.toFixed(1)} Ct`;
+
+  // ── ENTSCHEIDUNGEN ───────────────────────────────
+  const dec = {
+    pvCar:     d.car_connected && d.car_soc < CFG.car_target_soc && surplus >= CFG.pv_surplus_car,
+    batPv:     surplus >= CFG.pv_surplus_battery && d.battery_soc < CFG.battery_max && !d.car_connected,
+    cheapBat:  d.price_ct <= CFG.price_very_cheap && d.battery_soc < CFG.battery_max && !pvProducingWell,
+    cheapCar:  d.car_connected && d.car_soc < CFG.car_target_soc && d.price_ct <= CFG.price_cheap && surplus < CFG.pv_surplus_car,
+    expensive: d.price_ct >= CFG.price_expensive && d.battery_soc > CFG.battery_reserve,
+  };
+  const anyDec = Object.values(dec).some(Boolean);
+
+  setDec('d-pv-car',    dec.pvCar);
+  setDec('d-bat-pv',    dec.batPv);
+  setDec('d-cheap-bat', dec.cheapBat);
+  setDec('d-cheap-car', dec.cheapCar);
+  setDec('d-expensive', dec.expensive);
+  setDec('d-ok',        !anyDec);
+
+  // Update descriptions with live values
+  document.getElementById('dd-pv-car').textContent = `Überschuss: ${surplus.toFixed(1)} kW · Auto: ${d.car_soc}%`;
+  document.getElementById('dd-bat-pv').textContent = `Überschuss: ${surplus.toFixed(1)} kW · Akku: ${d.battery_soc}%`;
+  document.getElementById('dd-cheap-bat').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Akku: ${d.battery_soc}%`;
+  document.getElementById('dd-cheap-car').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Auto: ${d.car_soc}%`;
+  document.getElementById('dd-expensive').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Akku: ${d.battery_soc}%`;
+
+  // Notification
+  let notifText = '';
+  if (dec.pvCar)     notifText = `☀️ PV-Überschuss: ${surplus.toFixed(1)} kW – Auto laden empfohlen! (Auto: ${d.car_soc}%)`;
+  else if (dec.cheapBat) notifText = `💰 Strom sehr günstig: ${d.price_ct.toFixed(1)} Ct/kWh – Akku aus Netz laden empfohlen! (Akku: ${d.battery_soc}%)`;
+  else if (dec.cheapCar) notifText = `💡 Günstiger Strom: ${d.price_ct.toFixed(1)} Ct/kWh – Auto laden empfohlen! (Auto: ${d.car_soc}%)`;
+  else if (dec.expensive) notifText = `🔴 Strom teuer: ${d.price_ct.toFixed(1)} Ct/kWh – Akku entladen, Netzbezug vermeiden!`;
+
+  const nb = document.getElementById('notification-bar');
+  if (notifText) { nb.className = 'notification-bar show'; document.getElementById('notif-text').textContent = notifText; }
+  else nb.className = 'notification-bar';
+
+  // Timestamp
+  document.getElementById('timestamp').textContent =
+    'Letzte Aktualisierung: ' + new Date().toLocaleTimeString('de-DE');
+  document.getElementById('last-update').textContent = 'gerade eben';
+}
+
+function setDec(id, active) {
+  const el = document.getElementById(id);
+  el.className = el.className.replace(/\s*(active|inactive)/g, '') + (active ? ' active' : ' inactive');
+}
+
+// ─────────────────────────────────────────────────────
+// HOME ASSISTANT WEBSOCKET INTEGRATION
+// ─────────────────────────────────────────────────────
+
+let haClient = null;
+let simulationMode = false;
+let simInterval = null;
+
+/** Verbindet mit HA oder fällt auf Simulation zurück */
+function initConnection() {
+  const cfg = loadHAConfig();
+
+  if (!cfg.token) {
+    console.info('[HA] Kein Token – starte Simulationsmodus');
+    startSimulation();
+    showSetupBanner();
+    return;
+  }
+
+  haClient = new HAWebSocket({
+    host: cfg.host,
+    port: cfg.port,
+    ssl:  cfg.ssl,
+    token: cfg.token,
+    entities: {
+      pv_power:           document.getElementById('cfg-entity-pv')?.value      || DEFAULT_ENTITIES.pv_power,
+      house_consumption:  document.getElementById('cfg-entity-house')?.value   || DEFAULT_ENTITIES.house_consumption,
+      pv_forecast_today:  DEFAULT_ENTITIES.pv_forecast_today,
+      battery_soc:        DEFAULT_ENTITIES.battery_soc,
+      battery_power:      DEFAULT_ENTITIES.battery_power,
+      car_soc:            DEFAULT_ENTITIES.car_soc,
+      car_connected:      DEFAULT_ENTITIES.car_connected,
+      car_charging_power: DEFAULT_ENTITIES.car_charging_power,
+      grid_power:         DEFAULT_ENTITIES.grid_power,
+      current_price:      DEFAULT_ENTITIES.current_price,
+      price_level:        DEFAULT_ENTITIES.price_level,
+    },
+  });
+
+  haClient.onUpdate = (data) => {
+    Object.assign(liveData, data);
+    render();
+    updateConnectionStatus(true);
+  };
+
+  haClient.onConnectionChange = (connected) => {
+    updateConnectionStatus(connected);
+    if (!connected && !simulationMode) {
+      // Fallback auf Simulation bei Verbindungsverlust
+      startSimulation();
+    } else if (connected && simInterval) {
+      stopSimulation();
+    }
+  };
+
+  haClient.connect();
+}
+
+function updateConnectionStatus(connected) {
+  const badge = document.getElementById('live-badge-text');
+  const dot   = document.querySelector('.live-dot');
+  if (!badge) return;
+  if (connected) {
+    badge.textContent = 'LIVE · Home Assistant';
+    dot.style.background = 'var(--accent-green)';
+  } else {
+    badge.textContent = simulationMode ? 'SIMULATION' : 'VERBINDE...';
+    dot.style.background = simulationMode ? 'var(--accent-yellow)' : 'var(--accent-red)';
+  }
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
+}
+
+// ── Simulations-Fallback ─────────────────────────────
+function startSimulation() {
+  simulationMode = true;
+  if (simInterval) return;
+  render();
+  simInterval = setInterval(() => {
+    const jitter = (v, spread, min, max) => Math.max(min, Math.min(max, v + (Math.random() - 0.48) * spread));
+    liveData.pv_kw       = jitter(liveData.pv_kw, 0.4, 0, CFG.pv_peak_kw);
+    liveData.house_kw    = jitter(liveData.house_kw, 0.2, 0.3, 5);
+    liveData.battery_soc = jitter(liveData.battery_soc, 1, 5, 100);
+    liveData.battery_kw  = jitter(liveData.battery_kw, 0.3, -5, 5);
+    liveData.car_soc     = jitter(liveData.car_soc, 0.3, 0, 100);
+    liveData.price_ct    = jitter(liveData.price_ct, 2, -5, 60);
+    render();
+    updateConnectionStatus(false);
+  }, 5000);
+}
+
+function stopSimulation() {
+  simulationMode = false;
+  clearInterval(simInterval);
+  simInterval = null;
+}
+
+// ── Setup-Banner (wenn kein Token konfiguriert) ───────
+function showSetupBanner() {
+  const existing = document.getElementById('setup-banner');
+  if (existing) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'setup-banner';
+  banner.style.cssText = `
+    position: fixed; bottom: 20px; right: 20px; z-index: 100;
+    background: #0d1a10; border: 1px solid #1e4d2a;
+    border-radius: 12px; padding: 16px 20px; max-width: 340px;
+    font-family: 'DM Mono', monospace; font-size: 0.78rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  `;
+  banner.innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-weight:700;color:#39d353;margin-bottom:8px;">
+      ⚙️ HA-Verbindung einrichten
+    </div>
+    <div style="color:#7db889;margin-bottom:12px;line-height:1.5;">
+      Kein Token gefunden. Dashboard läuft im <strong>Simulationsmodus</strong>.
+      URL-Parameter setzen zum Verbinden:
+    </div>
+    <code style="display:block;background:#080c10;padding:8px 10px;border-radius:6px;color:#58a6ff;font-size:0.7rem;word-break:break-all;margin-bottom:10px;">
+      ?host=192.168.1.x&token=DEIN_TOKEN
+    </code>
+    <div style="color:#4a5568;font-size:0.68rem;">Token: HA → Profil → Langlebige Tokens</div>
+    <button onclick="this.parentElement.remove()" style="
+      margin-top:10px; background:none; border:1px solid #1e4d2a;
+      color:#39d353; border-radius:6px; padding:5px 12px;
+      cursor:pointer; font-family:inherit; font-size:0.72rem;
+    ">Verstanden</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+// ── Live-Badge ID ergänzen ─────────────────────────────
+document.querySelector('.live-badge').innerHTML =
+  `<div class="live-dot"></div><span id="live-badge-text">VERBINDE...</span>`;
+
+// ── Start ──────────────────────────────────────────────
+initConnection();
+</script>
+</body>
+</html>

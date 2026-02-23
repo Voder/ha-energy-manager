@@ -1,0 +1,39 @@
+# apps.yaml – AppDaemon Konfiguration für den Energy Manager
+# Ablegen unter: /config/appdaemon/apps/apps.yaml
+
+energy_manager:
+  module: energy_manager
+  class: EnergyManager
+
+  # ─────────────────────────────────────────
+  # Hier kannst du die Konfiguration überschreiben
+  # (Optional – Standardwerte sind im Python-Code hinterlegt)
+  # ─────────────────────────────────────────
+
+  # Hausakku
+  battery_capacity_kwh: 10.0
+  battery_min_soc: 10
+  battery_max_soc: 95
+  battery_reserve_evening: 30
+
+  # Elektroauto
+  car_battery_capacity_kwh: 77.0
+  car_max_charge_power_kw: 11.0
+  car_min_soc_target: 20
+  car_default_target_soc: 80
+
+  # PV-Anlage
+  pv_peak_power_kw: 10.0
+
+  # Preisschwellenwerte (Cent/kWh)
+  price_cheap_threshold: 15.0
+  price_very_cheap_threshold: 8.0
+  price_expensive_threshold: 30.0
+
+  # PV-Überschuss-Schwellenwerte (kW)
+  pv_surplus_for_car_charging: 3.0
+  pv_surplus_for_battery: 1.0
+
+  # Benachrichtigungen
+  notify_service: "notify.mobile_app_dein_smartphone"
+  check_interval_minutes: 15
