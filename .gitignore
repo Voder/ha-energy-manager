@@ -18,3 +18,7 @@ __pycache__/
 
 # AppDaemon Logs
 logs/
+
+# HACS
+!**/.managed-by-hacs
+!.managed-by-hacs
