@@ -275,7 +275,7 @@
     </div>
     <div class="live-badge">
       <div class="live-dot"></div>
-      LIVE · aktualisiert <span id="last-update">gerade eben</span>
+      LIVE · aktualisiert <span>gerade eben</span>
     </div>
   </div>
 
@@ -875,7 +875,7 @@ function showSetupBanner() {
 
 // ── Live-Badge ID ergänzen ─────────────────────────────
 document.querySelector('.live-badge').innerHTML =
-  `<div class="live-dot"></div><span id="live-badge-text">VERBINDE...</span>`;
+  `<div class="live-dot"></div><span id="live-badge-text">VERBINDE...</span> · <span id="last-update">--:--</span>`;
 
 // ── Start ──────────────────────────────────────────────
 initConnection();
