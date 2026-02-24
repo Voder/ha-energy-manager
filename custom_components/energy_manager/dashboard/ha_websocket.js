@@ -29,17 +29,19 @@ class HAWebSocket {
     this.token   = config.token;
     this.entities = config.entities ?? DEFAULT_ENTITIES;
 
-    this.ws           = null;
-    this.msgId        = 1;        // Jede WS-Nachricht braucht eine eindeutige ID
-    this.connected    = false;
-    this.reconnectMs  = 5000;     // Wiederverbindungsintervall
-    this._stateCache  = {};       // Lokaler Cache aller Entity-States
-    this._subId       = null;     // ID des state_changed-Subscriptions
+    this.ws              = null;
+    this.msgId           = 1;        // Jede WS-Nachricht braucht eine eindeutige ID
+    this.connected       = false;
+    this.reconnectMs     = 5000;     // Wiederverbindungsintervall
+    this.refreshIntervalMs = config.refreshIntervalMs ?? 30000; // Polling-Fallback für stille Entities
+    this._stateCache     = {};       // Lokaler Cache aller Entity-States
+    this._subId          = null;     // ID des state_changed-Subscriptions
+    this._refreshTimer   = null;     // Periodischer get_states-Poll
 
     /** Wird aufgerufen wenn sich Daten ändern – überschreiben! */
-    this.onUpdate = (liveData) => {};
+    this.onUpdate = (_liveData) => {};
     /** Wird aufgerufen bei Verbindungsstatusänderungen */
-    this.onConnectionChange = (connected) => {};
+    this.onConnectionChange = (_connected) => {};
   }
 
   // ─────────────────────────────────────────────
@@ -60,6 +62,7 @@ class HAWebSocket {
   }
 
   disconnect() {
+    this._stopRefreshTimer();
     if (this.ws) {
       this.ws.onclose = null; // Kein Auto-Reconnect
       this.ws.close();
@@ -90,6 +93,7 @@ class HAWebSocket {
         this.connected = true;
         this.onConnectionChange(true);
         this._fetchInitialStates();
+        this._startRefreshTimer();
         break;
 
       // 3. Authentifizierung fehlgeschlagen
@@ -117,6 +121,7 @@ class HAWebSocket {
 
   _onClose() {
     console.warn(`[HA] Verbindung getrennt – Wiederverbindung in ${this.reconnectMs / 1000}s`);
+    this._stopRefreshTimer();
     this.connected = false;
     this.onConnectionChange(false);
     setTimeout(() => this.connect(), this.reconnectMs);
@@ -142,13 +147,26 @@ class HAWebSocket {
     console.log('[HA] Subscribiert auf state_changed Events');
   }
 
-  /** Verarbeitet die initialen States (get_states Response) */
+  /** Verarbeitet get_states Antworten (initial und periodisch) */
   _processInitialStates(states) {
     for (const state of states) {
       this._stateCache[state.entity_id] = state;
     }
-    console.log(`[HA] ${states.length} States geladen`);
     this._emitUpdate();
+  }
+
+  _startRefreshTimer() {
+    if (this._refreshTimer) return; // läuft bereits
+    this._refreshTimer = setInterval(() => {
+      if (this.connected) this._send({ type: 'get_states' });
+    }, this.refreshIntervalMs);
+  }
+
+  _stopRefreshTimer() {
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
   }
 
   /** Verarbeitet ein einzelnes state_changed Event */
@@ -181,6 +199,13 @@ class HAWebSocket {
       return state?.state === 'on' || state?.state === 'home' || state?.state === 'connected';
     };
 
+    const getAttr = (key, attr, fallback = null) => {
+      const entityId = this.entities[key];
+      if (!entityId) return fallback;
+      const state = this._stateCache[entityId];
+      return state?.attributes?.[attr] ?? fallback;
+    };
+
     const liveData = {
       // PV
       pv_kw:              get('pv_power') / 1000,
@@ -197,8 +222,12 @@ class HAWebSocket {
       car_kw:             get('car_charging_power') / 1000,
 
       // Preis
-      price_ct:           get('current_price', 0),
-      price_level:        get('price_level', 'NORMAL'),
+      price_eur:          get('current_price', 0),
+      price_records:      (() => {
+        const records = getAttr('tibber_prices', 'records');
+        if (!Array.isArray(records)) return [];
+        return records.map(r => ({ time: r.Time, price: r.Price }));
+      })(),
 
       // Grid
       grid_kw:            get('grid_power') / 1000,
@@ -250,7 +279,7 @@ const DEFAULT_ENTITIES = {
   // Netz & Preis
   grid_power:           'sensor.grid_power',
   current_price:        'sensor.tibber_current_price',
-  price_level:          'sensor.tibber_price_level',
+  tibber_prices:        'sensor.tibber_prices',
 };
 
 

@@ -52,6 +52,7 @@ DEFAULT_CONFIG = {
 
         # Tibber / Strompreise
         "current_price": "sensor.tibber_current_price",
+        "tibber_prices": "sensor.tibber_prices",
     },
 
     # Benachrichtigungen

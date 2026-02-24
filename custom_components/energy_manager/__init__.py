@@ -17,6 +17,7 @@ Prioritäten:
 import json
 import logging
 import os
+import re
 import shutil
 from datetime import datetime, timedelta
 
@@ -50,6 +51,7 @@ _ENTITIES_SCHEMA = vol.Schema(
         vol.Optional("grid_power"): cv.entity_id,
         vol.Optional("house_consumption"): cv.entity_id,
         vol.Optional("current_price"): cv.entity_id,
+        vol.Optional("tibber_prices"): cv.entity_id,
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -355,7 +357,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
     # AKTIONEN AUSFÜHREN
     # ─────────────────────────────────────────────
 
-    async def _execute_decisions(self, decisions: list[dict], system: dict):
+    async def _execute_decisions(self, decisions: list[dict], system: dict):  # pyright: ignore[reportUnusedParameter]
         """Führt Entscheidungen aus – vorerst nur Benachrichtigungen."""
         if not decisions:
             _LOGGER.info("Keine besonderen Maßnahmen nötig.")
@@ -470,8 +472,17 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
             if not os.path.isfile(src_file):
                 continue
 
-            # Nur kopieren wenn Ziel nicht existiert oder Quelle neuer ist
-            if not os.path.exists(dest_file) or os.path.getmtime(src_file) > os.path.getmtime(dest_file):
+            if filename.endswith(".html"):
+                # HTML immer neu schreiben und Cache-Buster in Script-Tags injizieren,
+                # damit der HA Service Worker nie eine veraltete JS-Version ausliefert
+                with open(src_file, encoding="utf-8") as f:
+                    content = f.read()
+                ts = int(datetime.now().timestamp())
+                content = re.sub(r'(src="[^"]+\.js)(?:\?v=\d+)?"', rf'\1?v={ts}"', content)
+                with open(dest_file, "w", encoding="utf-8") as f:
+                    f.write(content)
+                _LOGGER.info("Dashboard HTML deployed mit Cache-Buster v=%d", ts)
+            elif not os.path.exists(dest_file) or os.path.getmtime(src_file) > os.path.getmtime(dest_file):
                 shutil.copy2(src_file, dest_file)
                 _LOGGER.info("Dashboard-Datei kopiert: %s", filename)
 

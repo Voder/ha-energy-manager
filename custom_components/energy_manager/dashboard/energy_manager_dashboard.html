@@ -254,6 +254,15 @@
   .conn-badge.disconnected { background: #1a0808; border-color: #3d0d0d; color: var(--accent-red); }
   .conn-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
+  /* Tibber Preis-Chart */
+  .price-chart-card {
+    grid-column: 1 / -1;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 12px; padding: 18px 20px;
+  }
+  .price-chart-svg { width: 100%; height: 80px; display: block; overflow: visible; }
+  .price-chart-info { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--muted); margin-top: 4px; }
+
   /* Responsive */
   @media (max-width: 640px) {
     .main-grid { grid-template-columns: 1fr; }
@@ -323,6 +332,20 @@
         </div>
         <div class="progress-track">
           <div class="progress-fill" id="surplus-bar"></div>
+        </div>
+      </div>
+
+      <div class="metric" style="padding-top:8px; border-top: 1px solid var(--border)">
+        <div class="metric-header">
+          <span class="metric-label">Hauslast</span>
+          <span class="metric-value" id="house-val">–</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="house-bar" style="background: var(--accent-orange)"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px">
+          <span class="metric-label" style="font-size:0.68rem">Netz</span>
+          <span id="grid-val" style="font-size:0.78rem">–</span>
         </div>
       </div>
     </div>
@@ -457,6 +480,20 @@
       </div>
     </div>
 
+    <!-- Tibber Tagespreise -->
+    <div class="price-chart-card">
+      <div class="card-title">
+        <div class="card-title-dot" style="background:var(--accent-orange)"></div>
+        Tibber · Strompreise Heute &amp; Morgen
+      </div>
+      <svg class="price-chart-svg" id="price-chart-svg" viewBox="0 0 480 80" preserveAspectRatio="none"></svg>
+      <div class="price-chart-info">
+        <span id="chart-min-label">Min: –</span>
+        <span id="chart-now-label">–</span>
+        <span id="chart-max-label">Max: –</span>
+      </div>
+    </div>
+
     <!-- Aktive Benachrichtigung -->
     <div class="notification-bar" id="notification-bar">
       <div class="notif-icon">📱</div>
@@ -491,21 +528,21 @@
         <div class="decision-item d-cheap-bat inactive" id="d-cheap-bat">
           <span class="di-icon">💰🔋</span>
           <div class="di-title">Akku aus Netz laden</div>
-          <div class="di-desc" id="dd-cheap-bat">Preis ≤ 8 Ct · Nacht / kein PV</div>
+          <div class="di-desc" id="dd-cheap-bat">Preis ≤ 0,08 € · Nacht / kein PV</div>
           <span class="di-badge">PRIO 2 · KOSTEN</span>
         </div>
 
         <div class="decision-item d-cheap-car inactive" id="d-cheap-car">
           <span class="di-icon">💡🚗</span>
           <div class="di-title">Auto günstig laden</div>
-          <div class="di-desc" id="dd-cheap-car">Preis ≤ 15 Ct · kein PV-Überschuss</div>
+          <div class="di-desc" id="dd-cheap-car">Preis ≤ 0,15 € · kein PV-Überschuss</div>
           <span class="di-badge">PRIO 2 · KOSTEN</span>
         </div>
 
         <div class="decision-item d-expensive inactive" id="d-expensive">
           <span class="di-icon">🔴⚡</span>
           <div class="di-title">Netzbezug vermeiden</div>
-          <div class="di-desc" id="dd-expensive">Strom teuer ≥ 30 Ct · Akku entladen</div>
+          <div class="di-desc" id="dd-expensive">Strom teuer ≥ 0,30 € · Akku entladen</div>
           <span class="di-badge">PRIO 2 · KOSTEN</span>
         </div>
 
@@ -535,7 +572,7 @@ const CFG = {
   car_capacity_kwh: 77.0,
   car_range_per_kwh: 6.5,          // km pro kWh (Fahrzeugspezifisch)
   pv_peak_kw: 10.0,
-  price_cheap: 15, price_very_cheap: 8, price_expensive: 30,
+  price_cheap: 0.15, price_very_cheap: 0.08, price_expensive: 0.30,
   pv_surplus_car: 3.0, pv_surplus_battery: 1.0,
   battery_reserve: 30, battery_max: 95,
   car_min_soc: 20, car_target_soc: 80,
@@ -562,15 +599,29 @@ const history = {
   pv:    generateRealisticHistory(4.5, CFG.sparkline_points, 1.5, 0, CFG.pv_peak_kw),
   bat:   generateRealisticHistory(55,  CFG.sparkline_points, 3,   5, 100),
   car:   generateRealisticHistory(65,  CFG.sparkline_points, 1.5, 0, 100),
-  price: generateRealisticHistory(18,  CFG.sparkline_points, 4,   -5, 60),
+  price: generateRealisticHistory(0.18, CFG.sparkline_points, 0.04, -0.05, 0.60),
 };
 
 // Aktuelle "Live"-Werte (simuliert – in Produktion durch HA-Daten ersetzen)
 let liveData = {
   pv_kw: 5.2, house_kw: 1.8, battery_soc: 62, battery_kw: 1.2,
   car_soc: 71, car_connected: true, car_kw: 0,
-  price_ct: 12.4, price_level: 'LOW',
+  price_eur: 0.124,
+  grid_kw: 1.8,
   pv_forecast_kwh: 34.5,
+  price_records: (() => {
+    const now = new Date();
+    const records = [];
+    for (let h = 0; h < 48; h++) {
+      const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h);
+      // Simuliertes Tagesprofil: günstig nachts, teuer morgens/abends
+      const profile = [0.09,0.08,0.08,0.07,0.08,0.10,0.18,0.25,0.22,0.17,0.14,0.13,
+                       0.12,0.13,0.14,0.16,0.21,0.28,0.31,0.27,0.20,0.15,0.11,0.09];
+      const base = profile[h % 24];
+      records.push({ time: t.toISOString(), price: base + (Math.random() - 0.5) * 0.02 });
+    }
+    return records;
+  })(),
 };
 
 // ─────────────────────────────────────────────────────
@@ -636,6 +687,20 @@ function render() {
   history.pv.push(d.pv_kw); history.pv.shift();
   updateSparkline('pv', history.pv, 0, CFG.pv_peak_kw);
 
+  // ── HAUSLAST & NETZ ──────────────────────────────
+  document.getElementById('house-val').textContent = d.house_kw.toFixed(2) + ' kW';
+  const housePct = Math.min(100, (d.house_kw / 10) * 100);
+  setBar('house-bar', housePct, 'var(--accent-orange)');
+  // Positiv = Einspeisung ins Netz, Negativ = Bezug aus Netz
+  const gridText  = d.grid_kw >  0.05 ? `⬆ Einspeisung ${d.grid_kw.toFixed(2)} kW`
+                  : d.grid_kw < -0.05 ? `⬇ Bezug ${Math.abs(d.grid_kw).toFixed(2)} kW`
+                  : '= kein Netzbezug';
+  const gridColor = d.grid_kw >  0.05 ? 'var(--accent-green)'
+                  : d.grid_kw < -0.05 ? 'var(--accent-red)'
+                  : 'var(--muted)';
+  document.getElementById('grid-val').textContent = gridText;
+  document.getElementById('grid-val').style.color  = gridColor;
+
   // ── AKKU ────────────────────────────────────────
   const batColor = socColor(d.battery_soc, { red: 15, yellow: 35, greenColor: 'var(--accent-blue)' });
   document.getElementById('bat-val').textContent = d.battery_soc + '%';
@@ -673,37 +738,37 @@ function render() {
   updateSparkline('car', history.car, 0, 100);
 
   // ── PREIS ───────────────────────────────────────
-  const priceColor = d.price_ct <= CFG.price_very_cheap ? 'var(--accent-green)'
-                   : d.price_ct <= CFG.price_cheap       ? 'var(--accent-yellow)'
-                   : d.price_ct >= CFG.price_expensive   ? 'var(--accent-red)'
+  const priceColor = d.price_eur <= CFG.price_very_cheap ? 'var(--accent-green)'
+                   : d.price_eur <= CFG.price_cheap       ? 'var(--accent-yellow)'
+                   : d.price_eur >= CFG.price_expensive   ? 'var(--accent-red)'
                    : 'var(--text)';
-  document.getElementById('price-val').textContent = d.price_ct.toFixed(1) + ' Ct/kWh';
+  document.getElementById('price-val').textContent = d.price_eur.toFixed(3) + ' €/kWh';
   document.getElementById('price-val').style.color = priceColor;
 
-  // Price needle position: -5..60 → 0..100%
-  const needlePct = Math.max(0, Math.min(100, (d.price_ct + 5) / 65 * 100));
+  // Price needle position: -0.05..0.60 → 0..100%
+  const needlePct = Math.max(0, Math.min(100, (d.price_eur + 0.05) / 0.65 * 100));
   document.getElementById('price-needle').style.left = needlePct + '%';
 
-  const levelLabel = d.price_ct <= CFG.price_very_cheap ? '🟢 SEHR GÜNSTIG'
-                   : d.price_ct <= CFG.price_cheap       ? '🟡 GÜNSTIG'
-                   : d.price_ct >= CFG.price_expensive   ? '🔴 TEUER'
+  const levelLabel = d.price_eur <= CFG.price_very_cheap ? '🟢 SEHR GÜNSTIG'
+                   : d.price_eur <= CFG.price_cheap       ? '🟡 GÜNSTIG'
+                   : d.price_eur >= CFG.price_expensive   ? '🔴 TEUER'
                    : '⚪ NORMAL';
   document.getElementById('price-level-label').textContent = levelLabel;
   document.getElementById('price-level-label').style.color = priceColor;
 
-  history.price.push(d.price_ct); history.price.shift();
+  history.price.push(d.price_eur); history.price.shift();
   const priceMin = Math.min(...history.price), priceMax = Math.max(...history.price);
-  updateSparkline('price', history.price, priceMin - 2, priceMax + 2);
-  document.getElementById('price-min-label').textContent = `Min: ${priceMin.toFixed(1)} Ct`;
-  document.getElementById('price-max-label').textContent = `Max: ${priceMax.toFixed(1)} Ct`;
+  updateSparkline('price', history.price, priceMin - 0.02, priceMax + 0.02);
+  document.getElementById('price-min-label').textContent = `Min: ${priceMin.toFixed(3)} €`;
+  document.getElementById('price-max-label').textContent = `Max: ${priceMax.toFixed(3)} €`;
 
   // ── ENTSCHEIDUNGEN ───────────────────────────────
   const dec = {
     pvCar:     d.car_connected && d.car_soc < CFG.car_target_soc && surplus >= CFG.pv_surplus_car,
     batPv:     surplus >= CFG.pv_surplus_battery && d.battery_soc < CFG.battery_max && !d.car_connected,
-    cheapBat:  d.price_ct <= CFG.price_very_cheap && d.battery_soc < CFG.battery_max && !pvProducingWell,
-    cheapCar:  d.car_connected && d.car_soc < CFG.car_target_soc && d.price_ct <= CFG.price_cheap && surplus < CFG.pv_surplus_car,
-    expensive: d.price_ct >= CFG.price_expensive && d.battery_soc > CFG.battery_reserve,
+    cheapBat:  d.price_eur <= CFG.price_very_cheap && d.battery_soc < CFG.battery_max && !pvProducingWell,
+    cheapCar:  d.car_connected && d.car_soc < CFG.car_target_soc && d.price_eur <= CFG.price_cheap && surplus < CFG.pv_surplus_car,
+    expensive: d.price_eur >= CFG.price_expensive && d.battery_soc > CFG.battery_reserve,
   };
   const anyDec = Object.values(dec).some(Boolean);
 
@@ -717,16 +782,16 @@ function render() {
   // Update descriptions with live values
   document.getElementById('dd-pv-car').textContent = `Überschuss: ${surplus.toFixed(1)} kW · Auto: ${d.car_soc}%`;
   document.getElementById('dd-bat-pv').textContent = `Überschuss: ${surplus.toFixed(1)} kW · Akku: ${d.battery_soc}%`;
-  document.getElementById('dd-cheap-bat').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Akku: ${d.battery_soc}%`;
-  document.getElementById('dd-cheap-car').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Auto: ${d.car_soc}%`;
-  document.getElementById('dd-expensive').textContent = `Preis: ${d.price_ct.toFixed(1)} Ct · Akku: ${d.battery_soc}%`;
+  document.getElementById('dd-cheap-bat').textContent = `Preis: ${d.price_eur.toFixed(3)} € · Akku: ${d.battery_soc}%`;
+  document.getElementById('dd-cheap-car').textContent = `Preis: ${d.price_eur.toFixed(3)} € · Auto: ${d.car_soc}%`;
+  document.getElementById('dd-expensive').textContent = `Preis: ${d.price_eur.toFixed(3)} € · Akku: ${d.battery_soc}%`;
 
   // Notification
   let notifText = '';
   if (dec.pvCar)     notifText = `☀️ PV-Überschuss: ${surplus.toFixed(1)} kW – Auto laden empfohlen! (Auto: ${d.car_soc}%)`;
-  else if (dec.cheapBat) notifText = `💰 Strom sehr günstig: ${d.price_ct.toFixed(1)} Ct/kWh – Akku aus Netz laden empfohlen! (Akku: ${d.battery_soc}%)`;
-  else if (dec.cheapCar) notifText = `💡 Günstiger Strom: ${d.price_ct.toFixed(1)} Ct/kWh – Auto laden empfohlen! (Auto: ${d.car_soc}%)`;
-  else if (dec.expensive) notifText = `🔴 Strom teuer: ${d.price_ct.toFixed(1)} Ct/kWh – Akku entladen, Netzbezug vermeiden!`;
+  else if (dec.cheapBat) notifText = `💰 Strom sehr günstig: ${d.price_eur.toFixed(3)} €/kWh – Akku aus Netz laden empfohlen! (Akku: ${d.battery_soc}%)`;
+  else if (dec.cheapCar) notifText = `💡 Günstiger Strom: ${d.price_eur.toFixed(3)} €/kWh – Auto laden empfohlen! (Auto: ${d.car_soc}%)`;
+  else if (dec.expensive) notifText = `🔴 Strom teuer: ${d.price_eur.toFixed(3)} €/kWh – Akku entladen, Netzbezug vermeiden!`;
 
   const nb = document.getElementById('notification-bar');
   if (notifText) { nb.className = 'notification-bar show'; document.getElementById('notif-text').textContent = notifText; }
@@ -736,6 +801,79 @@ function render() {
   document.getElementById('timestamp').textContent =
     'Letzte Aktualisierung: ' + new Date().toLocaleTimeString('de-DE');
   document.getElementById('last-update').textContent = 'gerade eben';
+
+  // ── TIBBER PREISDIAGRAMM ─────────────────────────
+  renderPriceChart(d.price_records);
+}
+
+function renderPriceChart(records) {
+  const svg = document.getElementById('price-chart-svg');
+  if (!records || records.length === 0) {
+    svg.innerHTML = '<text x="240" y="40" text-anchor="middle" font-size="10" fill="#4a5568" font-family="DM Mono,monospace">Keine Preisdaten – Entity konfigurieren</text>';
+    return;
+  }
+
+  const W = 480, H = 80;
+  const padT = 6, padB = 20, padL = 2, padR = 2;
+  const drawW = W - padL - padR;
+  const drawH = H - padT - padB;
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const todayStr = now.toDateString();
+
+  const bars = records.map(r => {
+    const dt = new Date(r.time);
+    return { hour: dt.getHours(), isToday: dt.toDateString() === todayStr, price: r.price };
+  });
+
+  const prices = bars.map(b => b.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices, CFG.price_expensive);
+  const n = bars.length;
+  const barW = drawW / n;
+  const gap = n > 30 ? 1 : 2;
+
+  let html = '';
+  // Trennlinie Heute/Morgen
+  const splitIdx = bars.findIndex((b, i) => i > 0 && b.isToday !== bars[i - 1].isToday);
+  if (splitIdx > 0) {
+    const sx = (padL + splitIdx * barW).toFixed(1);
+    html += `<line x1="${sx}" y1="${padT}" x2="${sx}" y2="${padT + drawH}" stroke="#243040" stroke-width="1" stroke-dasharray="3,2"/>`;
+    html += `<text x="${(parseFloat(sx) + 4).toFixed(1)}" y="${padT + 9}" font-size="7" fill="#4a5568" font-family="DM Mono,monospace">Morgen</text>`;
+  }
+
+  bars.forEach((bar, i) => {
+    const x = padL + i * barW;
+    const barH = Math.max(2, (bar.price / maxPrice) * drawH);
+    const y = padT + drawH - barH;
+
+    const color = bar.price <= CFG.price_very_cheap ? '#39d353'
+                : bar.price <= CFG.price_cheap       ? '#e3b341'
+                : bar.price >= CFG.price_expensive   ? '#f85149'
+                : '#58a6ff';
+    const opacity = bar.isToday ? '1' : '0.45';
+    const isNow = bar.isToday && bar.hour === currentHour;
+
+    if (isNow) {
+      html += `<rect x="${x.toFixed(1)}" y="${padT}" width="${barW.toFixed(1)}" height="${drawH}" fill="white" opacity="0.07" rx="1"/>`;
+    }
+    html += `<rect x="${(x + gap / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${(barW - gap).toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" opacity="${opacity}" rx="1.5"/>`;
+
+    // Stundenbeschriftung alle 6h und Mitternacht
+    if (bar.hour % 6 === 0) {
+      const label = bar.hour === 0 ? (bar.isToday ? '0h' : '0h') : `${bar.hour}h`;
+      html += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="7" fill="#4a5568" font-family="DM Mono,monospace">${label}</text>`;
+    }
+  });
+
+  svg.innerHTML = html;
+
+  document.getElementById('chart-min-label').textContent = `Min: ${minPrice.toFixed(3)} €/kWh`;
+  document.getElementById('chart-max-label').textContent = `Max: ${maxPrice.toFixed(3)} €/kWh`;
+  const nowBar = bars.find(b => b.isToday && b.hour === currentHour);
+  document.getElementById('chart-now-label').textContent =
+    nowBar ? `Jetzt: ${nowBar.price.toFixed(3)} €/kWh` : '–';
 }
 
 function setDec(id, active) {
@@ -815,7 +953,8 @@ function startSimulation() {
     liveData.battery_soc = jitter(liveData.battery_soc, 1, 5, 100);
     liveData.battery_kw  = jitter(liveData.battery_kw, 0.3, -5, 5);
     liveData.car_soc     = jitter(liveData.car_soc, 0.3, 0, 100);
-    liveData.price_ct    = jitter(liveData.price_ct, 2, -5, 60);
+    liveData.price_eur   = jitter(liveData.price_eur, 0.02, -0.05, 0.60);
+    liveData.grid_kw     = liveData.pv_kw - liveData.house_kw - liveData.battery_kw;
     render();
     updateConnectionStatus(false);
   }, 5000);
