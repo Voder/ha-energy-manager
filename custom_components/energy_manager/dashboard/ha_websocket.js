@@ -211,6 +211,8 @@ class HAWebSocket {
       pv_kw:              get('pv_power') / 1000,
       house_kw:           get('house_consumption') / 1000,
       pv_forecast_kwh:    get('pv_forecast_today', 0),
+      pv_forecast_remaining_kwh: get('pv_forecast_remaining', 0),
+      pv_forecast_tomorrow_kwh:  get('pv_forecast_tomorrow', 0),
 
       // Hausakku
       battery_soc:        get('battery_soc', 0),
@@ -266,6 +268,8 @@ const DEFAULT_ENTITIES = {
   pv_power:             'sensor.pv_power',
   house_consumption:    'sensor.house_consumption',
   pv_forecast_today:    'sensor.solcast_pv_forecast_today',
+  pv_forecast_remaining: 'sensor.solcast_forecast_remaining',
+  pv_forecast_tomorrow: 'sensor.solcast_pv_forecast_tomorrow',
 
   // Hausakku
   battery_soc:          'sensor.battery_soc',

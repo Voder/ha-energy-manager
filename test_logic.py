@@ -33,6 +33,13 @@ MOCK_SENSORS = {
     "sensor.tibber_current_price": 0.125,  # €/kWh (price_level wird automatisch berechnet)
     "sensor.solcast_pv_forecast_today":    18.0,  # kWh
     "sensor.solcast_forecast_remaining":    8.0,  # kWh
+    "sensor.solcast_pv_forecast_tomorrow":  22.5, # kWh
+    "sensor.solcast_pv_forecast_next_hour":  1.8, # kWh
+    "sensor.solcast_pv_forecast_d3":        19.0, # kWh
+    "sensor.solcast_pv_forecast_d4":        25.3, # kWh
+    "sensor.solcast_pv_forecast_d5":        12.7, # kWh
+    "sensor.solcast_pv_forecast_d6":        28.1, # kWh
+    "sensor.solcast_pv_forecast_d7":        15.4, # kWh
 }
 
 # ─────────────────────────────────────────────
@@ -112,6 +119,13 @@ def get_system_state(cfg: dict) -> dict:
         "pv_surplus_kw":            pv_surplus_kw,
         "pv_forecast_today_kwh":    safe_float(e["pv_forecast_today"]),
         "pv_forecast_remaining_kwh": safe_float(e["pv_forecast_remaining"]),
+        "pv_forecast_tomorrow_kwh": safe_float(e["pv_forecast_tomorrow"]),
+        "pv_forecast_next_hour_kwh": safe_float(e["pv_forecast_next_hour"]),
+        "pv_forecast_d3_kwh":       safe_float(e["pv_forecast_d3"]),
+        "pv_forecast_d4_kwh":       safe_float(e["pv_forecast_d4"]),
+        "pv_forecast_d5_kwh":       safe_float(e["pv_forecast_d5"]),
+        "pv_forecast_d6_kwh":       safe_float(e["pv_forecast_d6"]),
+        "pv_forecast_d7_kwh":       safe_float(e["pv_forecast_d7"]),
         "battery_soc":              safe_float(e["battery_soc"]),
         "battery_power_kw":         battery_power_kw,
         "car_soc":                  safe_float(e["car_soc"]),
@@ -191,6 +205,8 @@ def print_state(s: dict):
     print(f"  Akku:        {s['battery_soc']:.0f}%  ({s['battery_power_kw']:.2f} kW)")
     print(f"  Auto:        {s['car_soc']:.0f}%  ({'verbunden' if s['car_connected'] else 'getrennt'})  Ladeleistung: {s['car_charging_power_kw']:.2f} kW")
     print(f"  Preis:       {s['current_price_eur']:.3f} €/kWh  ({s['price_level']})")
+    print(f"  PV-Prognose: Heute {s['pv_forecast_today_kwh']:.1f} kWh | Rest {s['pv_forecast_remaining_kwh']:.1f} kWh | Morgen {s['pv_forecast_tomorrow_kwh']:.1f} kWh | Nächste Std {s['pv_forecast_next_hour_kwh']:.1f} kWh")
+    print(f"  PV 7-Tage:  D3={s['pv_forecast_d3_kwh']:.1f} D4={s['pv_forecast_d4_kwh']:.1f} D5={s['pv_forecast_d5_kwh']:.1f} D6={s['pv_forecast_d6_kwh']:.1f} D7={s['pv_forecast_d7_kwh']:.1f} kWh")
 
 
 def print_decisions(decisions: list[dict]):

@@ -33,6 +33,13 @@ DEFAULT_CONFIG = {
         "pv_power": "sensor.pv_power",
         "pv_forecast_today": "sensor.solcast_pv_forecast_today",
         "pv_forecast_remaining": "sensor.solcast_forecast_remaining",
+        "pv_forecast_tomorrow": "sensor.solcast_pv_forecast_tomorrow",
+        "pv_forecast_next_hour": "sensor.solcast_pv_forecast_next_hour",
+        "pv_forecast_d3": "sensor.solcast_pv_forecast_d3",
+        "pv_forecast_d4": "sensor.solcast_pv_forecast_d4",
+        "pv_forecast_d5": "sensor.solcast_pv_forecast_d5",
+        "pv_forecast_d6": "sensor.solcast_pv_forecast_d6",
+        "pv_forecast_d7": "sensor.solcast_pv_forecast_d7",
 
         # Hausakku
         "battery_soc": "sensor.battery_soc",

@@ -311,7 +311,8 @@
           <div class="tick" style="left:80%"><span class="tick-label">8 kW</span></div>
         </div>
         <div class="sparkline-container">
-          <div class="sparkline-label"><span>Verlauf (letzte Stunden)</span><span id="pv-forecast-label">Prognose heute: –</span></div>
+          <div class="sparkline-label"><span>Verlauf (letzte Stunden)</span></div>
+          <div class="sparkline-label"><span id="pv-forecast-label">Prognose: –</span></div>
           <svg class="sparkline" id="spark-pv" viewBox="0 0 200 36" preserveAspectRatio="none">
             <defs>
               <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
@@ -609,6 +610,8 @@ let liveData = {
   price_eur: 0.124,
   grid_kw: 1.8,
   pv_forecast_kwh: 34.5,
+  pv_forecast_remaining_kwh: 18.0,
+  pv_forecast_tomorrow_kwh: 28.3,
   price_records: (() => {
     const now = new Date();
     const records = [];
@@ -674,7 +677,8 @@ function render() {
   const pvPct = (d.pv_kw / CFG.pv_peak_kw) * 100;
   document.getElementById('pv-val').textContent = d.pv_kw.toFixed(1) + ' kW';
   setBar('pv-bar', pvPct, `linear-gradient(90deg, #e3b341, #39d353)`);
-  document.getElementById('pv-forecast-label').textContent = `Prognose heute: ${d.pv_forecast_kwh} kWh`;
+  document.getElementById('pv-forecast-label').textContent =
+    `Heute ${d.pv_forecast_kwh} kWh · Rest ${d.pv_forecast_remaining_kwh} kWh · Morgen ${d.pv_forecast_tomorrow_kwh} kWh`;
 
   const surplusPct = Math.max(0, (surplus / CFG.pv_peak_kw) * 100);
   const surplusColor = surplus >= CFG.pv_surplus_car ? 'var(--accent-green)'
