@@ -524,6 +524,7 @@
   <div class="timestamp" id="timestamp">Letzte Aktualisierung: –</div>
 </div>
 
+<script src="ha_entities.js"></script>
 <script src="ha_websocket.js"></script>
 <script>
 // ─────────────────────────────────────────────────────
@@ -766,19 +767,7 @@ function initConnection() {
     port: cfg.port,
     ssl:  cfg.ssl,
     token: cfg.token,
-    entities: {
-      pv_power:           document.getElementById('cfg-entity-pv')?.value      || DEFAULT_ENTITIES.pv_power,
-      house_consumption:  document.getElementById('cfg-entity-house')?.value   || DEFAULT_ENTITIES.house_consumption,
-      pv_forecast_today:  DEFAULT_ENTITIES.pv_forecast_today,
-      battery_soc:        DEFAULT_ENTITIES.battery_soc,
-      battery_power:      DEFAULT_ENTITIES.battery_power,
-      car_soc:            DEFAULT_ENTITIES.car_soc,
-      car_connected:      DEFAULT_ENTITIES.car_connected,
-      car_charging_power: DEFAULT_ENTITIES.car_charging_power,
-      grid_power:         DEFAULT_ENTITIES.grid_power,
-      current_price:      DEFAULT_ENTITIES.current_price,
-      price_level:        DEFAULT_ENTITIES.price_level,
-    },
+    entities: (typeof HA_ENTITIES !== 'undefined') ? HA_ENTITIES : DEFAULT_ENTITIES,
   });
 
   haClient.onUpdate = (data) => {

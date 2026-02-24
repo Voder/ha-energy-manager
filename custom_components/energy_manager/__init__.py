@@ -14,6 +14,7 @@ Prioritäten:
 4. CO₂-Minimierung
 """
 
+import json
 import logging
 import os
 import shutil
@@ -461,6 +462,16 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
             if not os.path.exists(dest_file) or os.path.getmtime(src_file) > os.path.getmtime(dest_file):
                 shutil.copy2(src_file, dest_file)
                 _LOGGER.info("Dashboard-Datei kopiert: %s", filename)
+
+        # Entitäts-Konfiguration als JS-Datei generieren
+        entities_js = (
+            "// Automatisch generiert von Energy Manager – nicht manuell bearbeiten\n"
+            f"const HA_ENTITIES = {json.dumps(self._entities, indent=2)};\n"
+        )
+        entities_dest = os.path.join(dest_dir, "ha_entities.js")
+        with open(entities_dest, "w") as f:
+            f.write(entities_js)
+        _LOGGER.info("Entitäts-Konfiguration nach ha_entities.js geschrieben")
 
         _LOGGER.info("Dashboard verfügbar unter /local/energy_manager/energy_manager_dashboard.html")
 
