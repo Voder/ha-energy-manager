@@ -50,7 +50,6 @@ _ENTITIES_SCHEMA = vol.Schema(
         vol.Optional("grid_power"): cv.entity_id,
         vol.Optional("house_consumption"): cv.entity_id,
         vol.Optional("current_price"): cv.entity_id,
-        vol.Optional("price_level"): cv.entity_id,
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -68,9 +67,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional("car_min_soc_target"): vol.Coerce(int),
                 vol.Optional("car_default_target_soc"): vol.Coerce(int),
                 vol.Optional("pv_peak_power_kw"): vol.Coerce(float),
-                vol.Optional("price_cheap_threshold"): vol.Coerce(float),
-                vol.Optional("price_very_cheap_threshold"): vol.Coerce(float),
-                vol.Optional("price_expensive_threshold"): vol.Coerce(float),
+                vol.Optional("price_cheap_threshold"): vol.Coerce(float),       # €/kWh
+                vol.Optional("price_very_cheap_threshold"): vol.Coerce(float),  # €/kWh
+                vol.Optional("price_expensive_threshold"): vol.Coerce(float),   # €/kWh
                 vol.Optional("pv_surplus_for_car_charging"): vol.Coerce(float),
                 vol.Optional("pv_surplus_for_battery"): vol.Coerce(float),
                 vol.Optional("notify_service"): cv.string,
@@ -185,10 +184,8 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
             # PV-Überschuss berechnen (positiv = Überschuss verfügbar)
             pv_surplus_w = pv_power_w - house_consumption_w
 
-            price_level_state = self.hass.states.get(e["price_level"])
-            price_level = price_level_state.state if price_level_state else "NORMAL"
-            if price_level in ("unavailable", "unknown"):
-                price_level = "NORMAL"
+            current_price_eur = self._safe_float(e["current_price"])
+            price_level = self._compute_price_level(current_price_eur)
 
             return {
                 # PV
@@ -207,7 +204,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
                 "grid_power_kw": grid_power_w / 1000,
                 "house_consumption_kw": house_consumption_w / 1000,
                 # Preise
-                "current_price_ct": self._safe_float(e["current_price"]),
+                "current_price_eur": current_price_eur,
                 "price_level": price_level,
                 # Zeit
                 "hour": datetime.now().hour,
@@ -229,7 +226,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
         """
         decisions = []
         cfg = self._cfg
-        price = s["current_price_ct"]
+        price = s["current_price_eur"]
         cheap = cfg.get("price_cheap_threshold", DEFAULT_CONFIG["price_cheap_threshold"])
         very_cheap = cfg.get("price_very_cheap_threshold", DEFAULT_CONFIG["price_very_cheap_threshold"])
         expensive = cfg.get("price_expensive_threshold", DEFAULT_CONFIG["price_expensive_threshold"])
@@ -289,7 +286,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
                     "priority": 2,
                     "reason": "Sehr günstiger Netzstrom",
                     "details": (
-                        f"Strompreis sehr günstig: {price:.1f} Ct/kWh\n"
+                        f"Strompreis sehr günstig: {price:.3f} €/kWh\n"
                         f"Speicher ({s['battery_soc']:.0f}%) aus dem Netz laden empfohlen!"
                     ),
                     "notify": True,
@@ -309,7 +306,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
                     "priority": 2,
                     "reason": "Günstiger Netzstrom",
                     "details": (
-                        f"Günstiger Strom: {price:.1f} Ct/kWh\n"
+                        f"Günstiger Strom: {price:.3f} €/kWh\n"
                         f"Auto-Akku: {s['car_soc']:.0f}% → Jetzt laden empfohlen!"
                     ),
                     "notify": True,
@@ -343,7 +340,7 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
                     "priority": 2,
                     "reason": "Hoher Strompreis",
                     "details": (
-                        f"Strom teuer: {price:.1f} Ct/kWh\n"
+                        f"Strom teuer: {price:.3f} €/kWh\n"
                         f"Speicher ({s['battery_soc']:.0f}%) statt Netzbezug nutzen empfohlen."
                     ),
                     "notify": True,
@@ -403,6 +400,21 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
     # HILFSFUNKTIONEN
     # ─────────────────────────────────────────────
 
+    def _compute_price_level(self, price: float) -> str:
+        """Berechnet Preisniveau anhand der konfigurierten Schwellenwerte (€/kWh)."""
+        cfg = self._cfg
+        very_cheap = cfg.get("price_very_cheap_threshold", DEFAULT_CONFIG["price_very_cheap_threshold"])
+        cheap      = cfg.get("price_cheap_threshold",      DEFAULT_CONFIG["price_cheap_threshold"])
+        expensive  = cfg.get("price_expensive_threshold",  DEFAULT_CONFIG["price_expensive_threshold"])
+
+        if price <= very_cheap:
+            return "VERY_CHEAP"
+        if price <= cheap:
+            return "CHEAP"
+        if price >= expensive:
+            return "EXPENSIVE"
+        return "NORMAL"
+
     def _is_pv_producing_well(self, s: dict) -> bool:
         """Prüft ob PV gerade gut produziert."""
         return s["pv_power_kw"] > (self._cfg.get("pv_peak_power_kw", DEFAULT_CONFIG["pv_peak_power_kw"]) * 0.2)
@@ -430,13 +442,13 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
     def _log_system_state(self, s: dict):
         """Gibt aktuellen Systemzustand ins Log aus."""
         _LOGGER.info(
-            "System | PV: %.1fkW (Überschuss: %.1fkW) | Akku: %.0f%% | Auto: %.0f%% (%s) | Preis: %.1fCt/kWh (%s)",
+            "System | PV: %.1fkW (Überschuss: %.1fkW) | Akku: %.0f%% | Auto: %.0f%% (%s) | Preis: %.3f€/kWh (%s)",
             s["pv_power_kw"],
             s["pv_surplus_kw"],
             s["battery_soc"],
             s["car_soc"],
             "verbunden" if s["car_connected"] else "getrennt",
-            s["current_price_ct"],
+            s["current_price_eur"],
             s["price_level"],
         )
 
@@ -495,8 +507,8 @@ class EnergyManagerCoordinator(DataUpdateCoordinator):
             old_price = float(old_val) if old_val not in (None, "unavailable", "unknown") else None
 
             # Nur reagieren wenn sich Preis signifikant ändert (> 2 Ct)
-            if old_price is not None and abs(new_price - old_price) > 2.0:
-                _LOGGER.info("Preisänderung: %.1f → %.1f Ct/kWh", old_price, new_price)
+            if old_price is not None and abs(new_price - old_price) > 0.02:
+                _LOGGER.info("Preisänderung: %.3f → %.3f €/kWh", old_price, new_price)
                 self.hass.async_create_task(self.async_refresh())
         except (ValueError, TypeError):
             pass

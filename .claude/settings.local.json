@@ -3,7 +3,9 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:www.hacs.xyz)",
-      "WebFetch(domain:appdaemon.readthedocs.io)"
+      "WebFetch(domain:appdaemon.readthedocs.io)",
+      "Bash(python3:*)",
+      "Bash(python:*)"
     ]
   }
 }

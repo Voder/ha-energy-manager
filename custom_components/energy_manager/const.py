@@ -18,10 +18,10 @@ DEFAULT_CONFIG = {
     # PV-Anlage
     "pv_peak_power_kw": 10.0,
 
-    # Strompreise (Schwellenwerte in Cent/kWh)
-    "price_cheap_threshold": 15.0,
-    "price_very_cheap_threshold": 8.0,
-    "price_expensive_threshold": 30.0,
+    # Strompreise (Schwellenwerte in €/kWh)
+    "price_cheap_threshold": 0.15,
+    "price_very_cheap_threshold": 0.08,
+    "price_expensive_threshold": 0.30,
 
     # PV-Schwellenwerte (kW)
     "pv_surplus_for_car_charging": 3.0,
@@ -52,7 +52,6 @@ DEFAULT_CONFIG = {
 
         # Tibber / Strompreise
         "current_price": "sensor.tibber_current_price",
-        "price_level": "sensor.tibber_price_level",
     },
 
     # Benachrichtigungen

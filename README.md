@@ -61,7 +61,6 @@ energy_manager:
     grid_power: sensor.grid_power
     house_consumption: sensor.house_consumption
     current_price: sensor.tibber_current_price
-    price_level: sensor.tibber_price_level
 
   # Optional: Schwellenwerte anpassen
   battery_capacity_kwh: 10.0
